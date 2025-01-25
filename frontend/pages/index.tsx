@@ -1,9 +1,16 @@
 import { useState } from 'react';
 import type { RevenueData } from './api/chat';
 
+interface Metrics {
+  irr: string;
+  npv: string;
+  peakEquity: string;
+}
+
 export default function Home() {
   const [message, setMessage] = useState('');
   const [response, setResponse] = useState('');
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,6 +29,7 @@ export default function Home() {
 
       const data = await res.json();
       setResponse(data.response);
+      setMetrics(data.metrics);
     } catch (error) {
       console.error('Error:', error);
       setResponse('Failed to get response');
@@ -38,6 +46,24 @@ export default function Home() {
             <div className="divide-y divide-gray-200">
               <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
                 <h1 className="text-3xl font-bold mb-8">QuickBooks AI Assistant</h1>
+                
+                {metrics && (
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-semibold text-blue-800">IRR</h3>
+                      <p className="text-lg font-bold text-blue-900">{metrics.irr}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-semibold text-green-800">NPV</h3>
+                      <p className="text-lg font-bold text-green-900">{metrics.npv}</p>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-semibold text-purple-800">Peak Equity</h3>
+                      <p className="text-lg font-bold text-purple-900">{metrics.peakEquity}</p>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <textarea
                     value={message}

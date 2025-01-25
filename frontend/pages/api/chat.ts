@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
+import { irr, npv } from 'financial';
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY!);
 
@@ -15,6 +16,34 @@ export type RevenueData = {
   total_gross_revenue: Record<string, number | null>;
 };
 
+function calculateFinancialMetrics(data: RevenueData) {
+  // Convert yearly data into cash flows
+  const cashFlows = Object.entries(data.total_gross_revenue)
+    .sort(([yearA], [yearB]) => yearA.localeCompare(yearB))
+    .map(([_, value]) => value || 0);
+
+  // Calculate IRR
+  const irrValue = cashFlows.some(v => v !== 0) ? irr(cashFlows) * 100 : 0;
+  
+  // Calculate NPV with a 10% discount rate
+  const npvValue = npv(0.10, ...cashFlows);
+  
+  // Calculate Peak Equity (maximum negative cash flow)
+  const peakEquity = Math.min(...cashFlows);
+
+  return {
+    irr: irrValue.toFixed(2) + '%',
+    npv: new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: 'USD' 
+    }).format(npvValue),
+    peakEquity: new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: 'USD' 
+    }).format(peakEquity)
+  };
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -26,6 +55,9 @@ export default async function handler(
   try {
     const { message, context } = req.body;
     
+    // Calculate financial metrics
+    const metrics = calculateFinancialMetrics(context);
+    
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
@@ -35,13 +67,13 @@ export default async function handler(
         },
         {
           role: "user",
-          content: `Context: ${JSON.stringify(context)}\n\nQuestion: ${message}`
+          content: `Context: ${JSON.stringify(context)}\nFinancial Metrics: ${JSON.stringify(metrics)}\n\nQuestion: ${message}`
         }
       ]
     });
 
     const response = completion.choices[0]?.message?.content || 'No response generated';
-    res.status(200).json({ response });
+    res.status(200).json({ response, metrics });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Failed to process request' });
